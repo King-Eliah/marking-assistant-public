@@ -460,9 +460,9 @@ Every script and every page moves through explicit states. No implicit transitio
       └───────┬───────┘                └───────┬────────┘
               └───────────────┬────────────────┘
                               ▼
-                       ┌──────────────┐  low conf  ┌──────────────────┐
-                       │ SEGMENTING   ├───────────►│ NEEDS_TRANSCRIPT │──► human types it
-                       └──────┬───────┘            └─────────┬────────┘
+                       ┌──────────────┐  low conf  ┌────────────────────┐
+                       │ SEGMENTING   ├───────────►│NEEDS_TRANSCRIPTION │──► human types it
+                       └──────┬───────┘            └─────────┬──────────┘
                               ▼                              │
                        ┌──────────────┐◄─────────────────────┘
                        │ UNDERSTANDING│
@@ -488,15 +488,22 @@ Every script and every page moves through explicit states. No implicit transitio
                        │  MODERATION  │───────►│   FINALISED  │──► export
                        └──────────────┘        └──────────────┘
 
-  Any state ──► FAILED (retries exhausted) ──► DLQ, alert, manual triage
+  Any MACHINE state ──► FAILED (retries exhausted) ──► DLQ, alert, manual triage
 ```
 
 **Transition rules (enforce in a single `transition()` function, nowhere else):**
 
 ```python
+# Machine states: a worker owns them, so retry exhaustion can send them to FAILED.
+MACHINE_STATES = {
+    "RECEIVED", "PREPROCESSING", "OCR_RUNNING", "OCR_ARBITRATING",
+    "OCR_AGREED", "SEGMENTING", "UNDERSTANDING", "SCORING",
+}
+
 ALLOWED = {
   "RECEIVED":        {"PREPROCESSING", "FAILED"},
   "PREPROCESSING":   {"OCR_RUNNING", "QUALITY_REJECTED", "FAILED"},
+  "QUALITY_REJECTED": {"PREPROCESSING", "FAILED"},  # retake re-enters preprocessing
   "OCR_RUNNING":     {"OCR_AGREED", "OCR_ARBITRATING", "FAILED"},
   "OCR_ARBITRATING": {"OCR_AGREED", "NEEDS_TRANSCRIPTION", "FAILED"},
   "OCR_AGREED":      {"SEGMENTING", "FAILED"},
@@ -509,8 +516,26 @@ ALLOWED = {
   "REVIEWED":        {"MODERATION", "FINALISED"},
   "MODERATION":      {"FINALISED", "AWAITING_REVIEW"},
   "FINALISED":       set(),   # terminal; corrections create a new attempt
+  "FAILED":          set(),   # terminal for this attempt; triage creates a new attempt
 }
 ```
+
+**Three defects corrected in v1.1** — the original table could not implement its own diagram:
+
+1. `QUALITY_REJECTED` had no key, so a script that failed the quality gate had no legal move
+   out and the diagram's "retake" arrow was unimplementable. A retake supplies a new image for
+   the same page slot, so it re-enters `PREPROCESSING`.
+2. `FAILED` had no key. It is now explicitly terminal for the attempt, consistent with
+   `FINALISED`. Manual triage creates a new attempt rather than reviving a dead one, which keeps
+   the append-only guarantee (I4) and the `(script_id, stage, pipeline_version)` idempotency key
+   intact.
+3. "Any state → FAILED" contradicted four rows that omit it. The prose was wrong, not the table:
+   `FAILED` means *a worker exhausted its retries*, and the human states (`AWAITING_REVIEW`,
+   `MANUAL_ONLY`, `REVIEWED`, `MODERATION`) have no worker to exhaust. The rule is now scoped to
+   `MACHINE_STATES`, and a human state can only be left by a human action.
+
+The state name is **`NEEDS_TRANSCRIPTION`** everywhere; the diagram previously truncated it to
+`NEEDS_TRANSCRIPT` for box width.
 
 **Idempotency:** every worker task is keyed by `(script_id, stage, pipeline_version)`. Re-running a completed stage is a no-op that returns the cached result. This makes retries safe and makes a full re-processing run after a model upgrade cheap and predictable.
 
