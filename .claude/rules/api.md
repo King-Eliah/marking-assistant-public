@@ -28,11 +28,18 @@ Every script and page stores its state. **Never infer state.** All transitions g
 single `transition()` function and nowhere else. The `ALLOWED` map in spec.md §4 is the only
 source of truth for legal moves.
 
-Known defects in the source table — resolve before implementing, do not silently paper over:
+Three defects in the original table were corrected in spec.md v1.1. The resolutions are binding:
 
-- `QUALITY_REJECTED` and `FAILED` are absent as keys despite the diagram giving both outbound arrows.
-- "Any state → FAILED" is contradicted by four rows that omit `FAILED`.
-- The diagram says `NEEDS_TRANSCRIPT`; the code says `NEEDS_TRANSCRIPTION`. Pick one before it reaches an enum.
+- `QUALITY_REJECTED → {PREPROCESSING, FAILED}`. A retake supplies a new image for the same page
+  slot and re-enters preprocessing.
+- `FAILED` is **terminal for the attempt**. Triage creates a new attempt; it never revives a dead
+  one. This is what keeps I4 and the `(script_id, stage, pipeline_version)` idempotency key intact.
+- Only `MACHINE_STATES` can reach `FAILED` — it means a worker exhausted its retries, and the
+  human states have no worker. A human state is left only by a human action.
+- The canonical name is `NEEDS_TRANSCRIPTION`. Never `NEEDS_TRANSCRIPT`.
+
+`transition()` must reject any move not in `ALLOWED`, and the rejection is an error, not a
+silent no-op. Unit-test every illegal edge, not just the legal ones.
 
 ## Append-only (I4)
 
