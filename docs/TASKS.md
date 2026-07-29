@@ -2,295 +2,142 @@
 
 The tracking file for this project. **Read this first when the instruction is "continue".**
 
-Sources: `spec.md` §12 (milestones M0–M10) and `frontend.md` §17 (screen phases 1–8),
-resequenced for **one engineer working alone**. spec.md §12.1 assumes three developers with
-contracts frozen at M1 to enable parallel work; solo, that coordination machinery is pure
-overhead and the ordering logic inverts — optimise for **external lead time** and for
-**killing the project early**, not for keeping three people unblocked.
+**Deadline: 2–3 weeks from 2026-07-29.** Target ship date **2026-08-19**.
 
-Realistic effort: spec.md quotes 12–13 weeks for a team of three. Solo that is roughly
-30 weeks equivalent. If a fixed deadline applies, cut stage 12 polish and the self-hosted OCR
-provider first. **Never cut stage 4 (evaluation) or stage 13 (calibration)** — a system with
-unmeasured accuracy is not defensible regardless of how well it demos.
+Sources: `spec.md` §12 (M0–M10) and `frontend.md` §17 (phases 1–8), resequenced for one engineer
+against a three-week clock. spec.md budgets 12–13 weeks for a team of three; that plan is not
+reachable and is not being attempted.
+
+## What this deadline buys, and what it does not
+
+**In:** every `[MVP]` screen (26 of 78, already marked in frontend.md), all five engines, the
+evaluation harness, real accuracy numbers, and a working end-to-end path from printed booklet to
+exported mark.
+
+**Out, explicitly:** M8 calibration on a real exam · M9 hardening · M10 pilot · the 52 non-MVP
+screens · analytics · moderation · integrity review · admin beyond user management · SIS export.
+
+**Therefore:** at ship this is defensible for a viva and usable for a demo. It is **not** safe for
+marking exams that count toward a real degree — thresholds will still be Appendix A defaults
+rather than values fitted to data. Say so plainly in the write-up. That honesty is the strongest
+position available and it is also simply true.
 
 ---
 
 ## Current position
 
-- [x] **Stage 0 — Scaffold** — complete except the CI push (no git remote yet)
-- [ ] **Stage 1 — Platform spine** ← next, not started
+- [x] **Stage 0 — Scaffold** — complete, 10 commits, CI blocked on `workflow` token scope
+- [ ] **Stage 1 — Platform spine** ← in progress
 
-Nothing in `apps/` contains product logic. The API has one `/healthz` endpoint; both
-clients render a placeholder heading; `packages/ui` exports only `cn()`. There are no
-models, no migrations, no screens, and no engines.
-
-**Answer the three open questions at the foot of this file before starting stage 1** — the
-`ALLOWED` table defects in particular, since stage 1 builds the state machine on top of them.
+Nothing in `apps/` contains product logic yet.
 
 ---
 
-## Stage 0 — Scaffold
+## Running in parallel — start today, not in week two
 
-Toolchains only. Zero features.
-
-- [x] Repository, `.gitignore`, `.gitattributes`, three specifications in `docs/`
-- [x] `CLAUDE.md` with invariants, layout, and make targets
-- [x] Six path-scoped rule files in `.claude/rules/`
-- [x] This ledger
-- [x] `apps/api` — FastAPI, SQLAlchemy 2, Alembic, Pydantic v2, Dramatiq, ruff, mypy
-- [x] `apps/console` and `apps/capture` — Vite, React, TS strict, Tailwind, shadcn, design tokens
-- [x] `packages/ui` — `cn()` only
-- [x] `docker-compose.yml` — api, worker, postgres 16 + pgvector, redis, minio
-- [x] `Makefile`, `.github/workflows/ci.yml`, `.env.example`
-
-**Acceptance**
-- [x] `make dev` brings the stack up and `/healthz` returns 200 — verified from the host, 5/5 containers healthy
-- [x] `make test` passes — 2 pytest, 1 vitest console, 1 vitest capture
-- [x] `make lint` passes — ruff check, ruff format --check, tsc ×2
-- [x] `make typecheck` passes — mypy strict on 9 files, tsc ×3
-- [ ] **CI green on a pushed branch — blocked: no git remote configured**
-
-Eight commits on `chore/scaffold`. Everything above is done except the push.
+- [ ] **Golden set.** Print ~40 booklets, recruit 3–4 people to hand-copy answers, photograph
+      them. Target 100 pages, 250 transcribed lines, 60 dual-marked answers. Scaled down from
+      spec.md's 200/500/150 to fit the clock. **Every accuracy number in week 3 depends on this
+      existing by end of week 1.**
+- [ ] **Provider billing.** Google Vision and Gemini keys, payment verified. Risk register rates
+      this Medium/High. If it fails on day 6 it costs a third of the remaining time.
+- [ ] `gh auth refresh -h github.com -s workflow`, so CI can run.
 
 ---
 
-## Stage 1 — Platform spine `M0`
+## Week 1 — the spine and the vision half
 
-The security substrate. Everything else assumes this is correct.
-
-- [ ] Auth: JWT RS256, access + refresh, rotation
-- [ ] RBAC: roles per `frontend.md` §7
-- [ ] `tenant_id` on every table; Postgres RLS policies enabled
-- [ ] Service-layer tenant scope check — the second independent layer
+### Stage 1 — Platform spine `M0`
+- [ ] Auth: JWT RS256, access + refresh
+- [ ] Two roles only: `LECTURER`, `ADMIN`. Full RBAC is out.
+- [ ] `tenant_id` on every table; Postgres RLS policies
+- [ ] Service-layer scope check — the second independent layer
 - [ ] Audit log with hash chain, verified on read
-- [ ] Alembic migrations, `make migrate`
+- [ ] `transition()` implementing the corrected `ALLOWED` table (spec.md §4 v1.1)
 
-**Acceptance**
-- [ ] A cross-tenant access attempt returns **404, not 403**, and appears in the audit log
-- [ ] RLS and the service-layer guard are tested independently — each catches the leak alone
-- [ ] Tampering with an audit row breaks chain verification
+**Gate:** cross-tenant access returns 404, appears in the audit log; every illegal state
+transition is rejected with an error, not a silent no-op.
 
----
+### Stage 2 — Booklet generator
+- [ ] A4 PDF: 4 ArUco fiducials, QR `{booklet_uuid, page_no, page_total, exam_id}`, question
+      boxes with declared max marks, anonymous UUID
 
-## Stage 2 — Booklet generator `slice of M2`
+**Gate:** a printed booklet's QR decodes from a phone photo; all four fiducials detect at 150 DPI.
 
-**Moved far forward from inside M2.** Small, and it gates everything physical. The golden set
-is 200 photographed *booklet* pages, so booklets must exist before capture can start. Printing,
-recruiting writers, and photographing carry multi-week lead time that no coding speed recovers.
+### Stage 3 — Engine 1, ingestion
+- [ ] Fiducial detection, homography warp, deskew, normalise to `WORK_LONG_EDGE`
+- [ ] Quality gate with actionable rejection messages
+- [ ] Plain-paper fallback **cut** — booklets only
 
-- [ ] Server-side booklet PDF: 4 ArUco fiducials (12mm, corners)
-- [ ] QR encoding `{booklet_uuid, page_no, page_total, exam_id}`
-- [ ] Printed question boxes with declared max marks
-- [ ] Anonymous booklet UUID — no student name on the page
-
-**Acceptance**
-- [ ] A generated booklet prints at A4 and its QR decodes from a phone photograph
-- [ ] All four fiducials detect at 150 DPI under uneven lighting
+**Gate:** ≥95% of golden photographs warp correctly.
 
 ---
 
-## Stage 3 — Golden set acquisition `M1 data` — starts here, runs for weeks
+## Week 2 — the understanding half and the product
 
-**Start on day one of this stage and let it run in the background.** The risk register rates
-"no lecturer will release real scripts" as *Critical* likelihood-medium and says explicitly:
-ask on day one, not week eight. This is the only task where working harder does not help.
-
-- [ ] Request real scripts from a lecturer; offer anonymisation
-- [ ] Fallback: volunteers copy answers by hand onto generated booklets
-- [ ] 200 photographed pages, varied handwriting and lighting
-- [ ] 500 hand-transcribed lines (ground truth for CER/WER)
-- [ ] 150 dual-marked answers (ground truth for QWK)
-- [ ] Negation and paraphrase probe sets
-- [ ] Prompt-injection test set
-
-**Acceptance**
-- [ ] The set is committed, versioned, and documented
-- [ ] Licensing and consent for every real script is recorded
-
----
-
-## Stage 4 — Evaluation harness `M1 code`
-
-Built before the pipeline it measures. Non-negotiable.
-
-- [ ] CER / WER scorers
-- [ ] QWK scorer against dual-marked ground truth
-- [ ] Per-provider comparison over one golden set
-- [ ] `make evaluate`
-
-**Acceptance**
-- [ ] `make evaluate` prints CER, WER, and QWK against the golden set
-- [ ] Re-running produces identical numbers
-
----
-
-## Stage 5 — Engine 1, ingestion `rest of M2`
-
-- [ ] Fiducial detection and homography warp
-- [ ] Deskew, denoise, normalise to `WORK_LONG_EDGE`
-- [ ] Quality gate with computable thresholds
-- [ ] Client-side pre-flight
-- [ ] Plain-paper fallback — **second, explicitly degraded**
-
-**Acceptance**
-- [ ] ≥95% of golden photographs produce correct warps
-- [ ] Every rejection message tells the user what to do differently
-
----
-
-## Stage 6 — Engine 2, OCR `M3 + M4`
-
+### Stage 4 — Engine 2, OCR
 - [ ] Tier 1: primary provider, line reconstruction, per-line confidence, raw archival
-- [ ] Content-hash cache
-- [ ] Tier 2: cascade, arbiter, reconciliation
-- [ ] Strikethrough rule
-- [ ] Human transcription UI — minimal, functional
-- [ ] `NEEDS_TRANSCRIPTION` path end to end
+- [ ] Content-hash cache — re-running must cost $0
+- [ ] Tier 2 arbitration **only if week 1 finished early**
+- [ ] Human transcription screen (MVP `/transcribe/:scriptId`)
 
-**Acceptance**
-- [ ] CER ≤ 8% Tier 1, ≤ 6% with Tier 2
-- [ ] Tier-2 trigger rate lands 10–30%
-- [ ] Re-running a completed page costs $0
+**Gate:** CER ≤ 8% Tier 1 on the golden set.
 
----
-
-## Stage 7 — Engine 3, answer understanding `M5`
-
-Largest engine. 2 weeks for a team; budget more.
-
-- [ ] Segmentation against printed question boxes
-- [ ] Embeddings, reranking, Hungarian assignment
-- [ ] NLI + LLM entailment behind `EntailmentProvider`
-- [ ] Response schema enforcement — **numeric fields rejected at parse (I2)**
+### Stage 5 — Engine 3, answer understanding
+- [ ] Segmentation by printed question box — a lookup, not an inference
+- [ ] Embeddings + entailment behind `EntailmentProvider`
+- [ ] Response schema enforcement: **numeric fields rejected at parse (I2)**
 - [ ] Injection detection on OCR text (I6)
+- [ ] Reranking and Hungarian assignment **cut unless time allows**
 
-**Acceptance**
-- [ ] Negation set ≥95% `CONTRADICTED` with **zero** `ENTAILED` — a hard zero
-- [ ] Paraphrase recall ≥ 0.85
-- [ ] No LLM response containing a number ever reaches scoring
+**Gate:** negation set ≥95% `CONTRADICTED` with **zero** `ENTAILED`. Hard zero, non-negotiable.
 
----
-
-## Stage 8 — Engine 4, rule engine `M6`
-
-Smallest engine, strictest gate. The cheapest possible proof that the scoring half is sound.
-
+### Stage 6 — Engine 4, rule engine
 - [ ] Pure function: no database, no network, no clock, no randomness
-- [ ] YAML rule configuration
-- [ ] Decision traces
-- [ ] Evaluation order exactly as spec.md §4.3
+- [ ] YAML config, decision traces, evaluation order per spec.md §4.3
 
-**Acceptance**
-- [ ] 10,000 property-test cases pass
-- [ ] 60 golden fixtures match exactly
-- [ ] A test asserts no I/O imports reach the module
+**Gate:** 10,000 property-test cases pass; a test asserts no I/O imports reach the module.
 
----
-
-## Stage 9 — Throwaway review harness
-
-**Not in either source document.** Deliberately ugly, explicitly disposable. Alone, you need to
-see suggestions and evidence before building 78 screens on top of them, and before calibration
-can be judged by eye.
-
-- [ ] Render a script, its suggestions, and evidence spans
-- [ ] No design system, no polish, delete at stage 12
-
-**Acceptance**
-- [ ] A full script's suggestions are inspectable end to end
-
----
-
-## Stage 10 — Console shell and authoring `FE 1–2`
-
-First real UI. Desktop ≥1280 only.
-
-- [ ] Auth screens A1–A4, home C1
-- [ ] Sidebar + top bar, design tokens, `packages/ui` primitives
-- [ ] Courses D1–D2, exams E1–E3, questions and rubric F1–F4
-- [ ] Rubric linter (Appendix C) blocking freeze
-
-**Acceptance**
-- [ ] A lecturer creates an exam and freezes a rubric
-- [ ] The linter blocks a non-atomic marking point
-
----
-
-## Stage 11 — Capture PWA and intake `FE 3`
-
-Mobile only, offline first.
-
-- [ ] Booklet registration G1–G3
-- [ ] Camera capture H1–H5, on-device quality pre-check
-- [ ] IndexedDB upload queue surviving connection loss and process death
-- [ ] Processing view I1
-
-**Acceptance**
-- [ ] 300 scripts captured and uploaded
-- [ ] Airplane mode mid-batch loses nothing
-
----
-
-## Stage 12 — Review workspace `M7 / FE 4` — **this is the product**
-
-Everything before is setup; everything after is around it.
-
-- [ ] Marking queue J1, review workspace J2–J4
-- [ ] Evidence highlighting with tints, badges, dash patterns
+### Stage 7 — Review workspace `this is the product`
+- [ ] `/exams/:id/marking` queue and `/exams/:id/marking/:scriptId` workspace
+- [ ] Evidence highlighting: tints, letter badges, dash patterns, stable assignment
 - [ ] Full keyboard flow
-- [ ] Audit view, appeal bundle
-- [ ] Delete the stage 9 harness
 
-**Acceptance**
-- [ ] A marker clears 20 scripts in under 15 minutes **without touching a mouse**
-- [ ] No bare number appears anywhere in the UI
-- [ ] Nothing the system generates renders red
+**Gate:** clear 20 scripts in under 15 minutes without a mouse · no bare numbers anywhere ·
+nothing the system generates renders red.
 
 ---
 
-## Stage 13 — Calibration and shadow run `M8`
+## Week 3 — measure, complete the MVP, write up
 
-- [ ] Fit thresholds on real data
-- [ ] Process one real exam in shadow mode
-- [ ] Produce the §8.4 QWK comparison table
+### Stage 8 — Evaluation harness
+- [ ] CER / WER / QWK scorers, `make evaluate`
 
-**Acceptance**
-- [ ] The comparison table exists with real numbers, not projections
+**Gate:** `make evaluate` prints real numbers against the golden set. Re-running gives identical
+results.
 
----
+### Stage 9 — Remaining MVP screens
+- [ ] Auth A1–A4, home C1, courses D1–D2, exams E1–E3, questions/rubric F1–F4
+- [ ] Rubric linter (Appendix C) blocking freeze
+- [ ] Capture H1–H5 with IndexedDB offline queue, processing I1
+- [ ] Results K1, K5, CSV/PDF export with per-mark attribution
 
-## Stage 14 — Close-out `FE 5`
+**Gate:** a lecturer creates an exam, prints booklets, captures 20 scripts, marks them, exports.
 
-- [ ] Results K1, K4, K5; export; single-script report
-- [ ] Finalisation with sample-audit enforcement — forced review of a random 10% above 50 scripts
-- [ ] Identity resolution at export only
-
-**Acceptance**
-- [ ] Results finalise and export with per-mark attribution
-
----
-
-## Stage 15 — Hardening and pilot `M9 + M10`
-
-- [ ] Rate limits, per-tenant cost caps, DLQ triage
-- [ ] Backup restore drill
-- [ ] Dependency scan, penetration checklist
-- [ ] One real course, lecturer in the loop
-
-**Acceptance**
-- [ ] Restore from backup into a clean environment succeeds
-- [ ] The injection test set changes no marks
-- [ ] **The lecturer chooses to use it again**
+### Stage 10 — Write-up
+- [ ] Accuracy numbers with honest error bars
+- [ ] Known limitations, explicitly including uncalibrated thresholds
+- [ ] Which invariants are enforced where, and how each is tested
 
 ---
 
-## Deferred to v2
+## Deferred — name these as deferred, not missing
 
-Diagrams · graphs · sketches · mathematical derivations · code answers · hand-drawn tables ·
-non-English answers · MCQ (use OMR) · multi-marker moderation beyond the basics · SIS integration.
+M8 calibration · M9 hardening · M10 pilot · 52 non-MVP screens · Tier-2 OCR if cut · reranking if
+cut · plain-paper fallback · diagrams, graphs, maths, code answers, hand-drawn tables,
+non-English, MCQ · moderation · integrity · analytics · SIS integration.
 
 ## Open questions
 
-- [ ] Deadline? Determines what gets cut from stages 12 and 14.
-- [ ] Which institution is the pilot, and is the golden-set request already in flight?
-- [ ] Resolve the `ALLOWED` table defects noted in `.claude/rules/api.md` before stage 1.
+- [ ] Does the week-3 deliverable need a live demo, or only the written artefact?
+- [ ] Who are the 3–4 people writing the golden set, and when?
