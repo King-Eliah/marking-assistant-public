@@ -17,8 +17,15 @@ unmeasured accuracy is not defensible regardless of how well it demos.
 
 ## Current position
 
-- [x] **Stage 0 — Scaffold** ← complete
-- [ ] **Stage 1 — Platform spine** ← next
+- [x] **Stage 0 — Scaffold** — complete except the CI push (no git remote yet)
+- [ ] **Stage 1 — Platform spine** ← next, not started
+
+Nothing in `apps/` contains product logic. The API has one `/healthz` endpoint; both
+clients render a placeholder heading; `packages/ui` exports only `cn()`. There are no
+models, no migrations, no screens, and no engines.
+
+**Answer the three open questions at the foot of this file before starting stage 1** — the
+`ALLOWED` table defects in particular, since stage 1 builds the state machine on top of them.
 
 ---
 
@@ -30,17 +37,20 @@ Toolchains only. Zero features.
 - [x] `CLAUDE.md` with invariants, layout, and make targets
 - [x] Six path-scoped rule files in `.claude/rules/`
 - [x] This ledger
-- [ ] `apps/api` — FastAPI, SQLAlchemy 2, Alembic, Pydantic v2, Dramatiq, ruff, mypy
-- [ ] `apps/console` and `apps/capture` — Vite, React, TS strict, Tailwind, shadcn, design tokens
-- [ ] `packages/ui` — `cn()` only
-- [ ] `docker-compose.yml` — api, worker, postgres 16 + pgvector, redis, minio
-- [ ] `Makefile`, `.github/workflows/ci.yml`, `.env.example`
+- [x] `apps/api` — FastAPI, SQLAlchemy 2, Alembic, Pydantic v2, Dramatiq, ruff, mypy
+- [x] `apps/console` and `apps/capture` — Vite, React, TS strict, Tailwind, shadcn, design tokens
+- [x] `packages/ui` — `cn()` only
+- [x] `docker-compose.yml` — api, worker, postgres 16 + pgvector, redis, minio
+- [x] `Makefile`, `.github/workflows/ci.yml`, `.env.example`
 
 **Acceptance**
-- [ ] `make dev` brings the stack up and `/healthz` returns 200
-- [ ] `make test` passes
-- [ ] `make lint` passes
-- [ ] CI green on a pushed branch
+- [x] `make dev` brings the stack up and `/healthz` returns 200 — verified from the host, 5/5 containers healthy
+- [x] `make test` passes — 2 pytest, 1 vitest console, 1 vitest capture
+- [x] `make lint` passes — ruff check, ruff format --check, tsc ×2
+- [x] `make typecheck` passes — mypy strict on 9 files, tsc ×3
+- [ ] **CI green on a pushed branch — blocked: no git remote configured**
+
+Eight commits on `chore/scaffold`. Everything above is done except the push.
 
 ---
 
