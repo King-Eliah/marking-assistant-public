@@ -1,18 +1,21 @@
-import { cn } from "@marking/ui";
+import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+
+import { HomePage } from "@/pages/home";
+import { SignInPage } from "@/pages/sign-in";
 
 /**
- * Scaffold shell. No screens yet — the console shell and auth land at stage 10,
- * see docs/TASKS.md.
+ * Console routes. Only the MVP shell so far — the rest of the sitemap
+ * (frontend.md §2) lands with its screens.
  */
 export function App() {
   return (
-    <main className={cn("grid min-h-dvh place-items-center bg-background p-8")}>
-      <div className="max-w-prose space-y-2 text-center">
-        <h1 className="text-2xl font-semibold text-foreground">Marking Assistant</h1>
-        <p className="text-sm text-muted-foreground">
-          Console scaffold. Desktop 1280px and up.
-        </p>
-      </div>
-    </main>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/sign-in" element={<SignInPage />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
+      </Routes>
+    </Router>
   );
 }

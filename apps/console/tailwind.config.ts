@@ -14,6 +14,23 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)"],
+        cond: ["var(--font-cond)"],
+        mono: ["var(--font-mono)"],
+      },
+      // design.md §3.2. Three weights only: 400, 500, 600.
+      fontSize: {
+        caption: ["11px", { lineHeight: "16px", fontWeight: "500" }],
+        xs: ["12px", { lineHeight: "16px" }],
+        sm: ["13px", { lineHeight: "18px" }],
+        base: ["15px", { lineHeight: "22px" }],
+        lead: ["17px", { lineHeight: "26px" }],
+        h3: ["20px", { lineHeight: "26px", fontWeight: "600" }],
+        h2: ["26px", { lineHeight: "32px", fontWeight: "600" }],
+        h1: ["34px", { lineHeight: "40px", fontWeight: "600" }],
+        mark: ["28px", { lineHeight: "32px", fontWeight: "500" }],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
