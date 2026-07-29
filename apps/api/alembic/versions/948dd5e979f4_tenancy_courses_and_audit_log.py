@@ -12,8 +12,9 @@ Row-Level Security (I7) and audit immutability (I4).
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "948dd5e979f4"
 down_revision: str | None = None
