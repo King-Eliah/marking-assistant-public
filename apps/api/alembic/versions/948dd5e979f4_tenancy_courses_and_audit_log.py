@@ -237,9 +237,21 @@ def _make_audit_log_immutable() -> None:
         FOR EACH ROW EXECUTE FUNCTION audit_log_is_append_only()
         """
     )
+    # A FOR EACH ROW trigger does not fire on TRUNCATE, so the row trigger above
+    # leaves the whole log wipeable in one statement. Verified: TRUNCATE removed
+    # every row without raising. A statement-level trigger is the only thing
+    # that closes it.
+    op.execute(
+        """
+        CREATE TRIGGER audit_log_no_truncate
+        BEFORE TRUNCATE ON audit_log
+        FOR EACH STATEMENT EXECUTE FUNCTION audit_log_is_append_only()
+        """
+    )
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS audit_log_no_truncate ON audit_log")
     op.execute("DROP TRIGGER IF EXISTS audit_log_no_update_or_delete ON audit_log")
     op.execute("DROP FUNCTION IF EXISTS audit_log_is_append_only()")
     for table in (*TENANT_SCOPED_TABLES, "tenants"):

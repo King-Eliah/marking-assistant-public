@@ -18,6 +18,26 @@ jobs:
   backend:
     name: backend — ruff · mypy · pytest
     runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.0-pg16
+        env:
+          POSTGRES_USER: marking
+          POSTGRES_PASSWORD: marking
+          POSTGRES_DB: marking
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U marking -d marking"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql+psycopg://marking:marking@localhost:5433/marking
+      TEST_DATABASE_URL: postgresql+psycopg://marking:marking@localhost:5433/marking
+
     steps:
       - uses: actions/checkout@v4
 
@@ -44,9 +64,26 @@ jobs:
         working-directory: apps/api
         run: mypy app
 
+      - name: Migrate
+        working-directory: apps/api
+        run: alembic upgrade head
+
       - name: Test
         working-directory: apps/api
         run: pytest -q
+
+      # A skipped isolation test is worse than no isolation test: the build is
+      # green and nothing was checked. Fail if the integration tests did not run.
+      - name: Assert integration tests actually ran
+        working-directory: apps/api
+        run: |
+          pytest -m integration -q --collect-only >/dev/null
+          pytest -m integration -q | tee /tmp/integration.txt
+          grep -qE "[0-9]+ passed" /tmp/integration.txt
+          if grep -q "skipped" /tmp/integration.txt; then
+            echo "::error::integration tests were skipped — the database was not reachable"
+            exit 1
+          fi
 
   frontend:
     name: frontend — tsc · vitest
