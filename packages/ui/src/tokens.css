@@ -1,0 +1,136 @@
+/* Design tokens — docs/design.md §2.2 (light) and §2.3 (dark).
+ *
+ * Defined once and imported by both clients, per design.md §0: "Build the token
+ * layer and components/ui once." Do not copy these values into an app.
+ *
+ * Colour encodes authorship. Indigo = the machine said this. Red = a person did
+ * this. Green = settled. Amber = needs a person. Nothing the system generates is
+ * ever red. See .claude/rules/design-tokens.md.
+ */
+
+@layer base {
+  :root {
+    /* surfaces — cool paper, not cream */
+    --background:            220 23% 97%;   /* #F7F8FA */
+    --foreground:            218 22% 10%;   /* #14181F */
+    --card:                  0 0% 100%;     /* #FFFFFF */
+    --card-foreground:       218 22% 10%;
+    --popover:               0 0% 100%;
+    --popover-foreground:    218 22% 10%;
+    --muted:                 220 21% 95%;   /* #EEF0F4 */
+    --muted-foreground:      215 12% 40%;   /* #5A6472 */
+    --accent:                220 21% 95%;
+    --accent-foreground:     218 22% 10%;
+    --border:                218 19% 89%;   /* #DDE1E8 */
+    --input:                 218 19% 89%;
+    --ring:                  230 38% 48%;
+
+    /* authorship */
+    --primary:               230 38% 48%;   /* #4C5BA8  machine / indigo */
+    --primary-foreground:    0 0% 100%;
+    --secondary:             220 21% 95%;
+    --secondary-foreground:  218 22% 10%;
+    --destructive:           4 62% 48%;     /* #C8382F  marker red */
+    --destructive-foreground:0 0% 100%;
+
+    /* semantic states */
+    --settled:               160 59% 30%;   /* #1F7A5C  finalised */
+    --settled-foreground:    0 0% 100%;
+    --settled-subtle:        160 40% 94%;
+    --caution:               35 86% 38%;    /* #B4700E  needs judgement */
+    --caution-foreground:    0 0% 100%;
+    --caution-subtle:        38 78% 95%;
+    --machine-subtle:        230 45% 95%;
+    --marker-subtle:         4 60% 96%;
+
+    /* page viewer surround — neutral in BOTH themes */
+    --viewer-surround:       220 12% 88%;
+
+    /* evidence tints — categorical, drawn over photographs */
+    --ev-a: 230 38% 48%;   /* indigo  */
+    --ev-b: 160 59% 30%;   /* green   */
+    --ev-c: 35 86% 38%;    /* amber   */
+    --ev-d: 275 38% 48%;   /* violet  */
+    --ev-e: 190 78% 30%;   /* teal    */
+    --ev-f: 25 52% 36%;    /* umber   */
+    --ev-fill: 0.18;       /* fill alpha over an image */
+
+    /* charts — same family, no rainbow */
+    --chart-1: 230 38% 48%;
+    --chart-2: 190 78% 30%;
+    --chart-3: 160 59% 30%;
+    --chart-4: 35 86% 38%;
+    --chart-5: 275 38% 48%;
+
+    /* sidebar (shadcn sidebar tokens) */
+    --sidebar-background:        220 21% 96%;
+    --sidebar-foreground:        218 22% 10%;
+    --sidebar-primary:           230 38% 48%;
+    --sidebar-primary-foreground:0 0% 100%;
+    --sidebar-accent:            220 21% 92%;
+    --sidebar-accent-foreground: 218 22% 10%;
+    --sidebar-border:            218 19% 89%;
+    --sidebar-ring:              230 38% 48%;
+
+    --radius: 0.375rem;   /* 6px — controls */
+  }
+}
+
+@layer base {
+  .dark {
+    --background:            220 18% 8%;
+    --foreground:            220 20% 96%;
+    --card:                  220 16% 11%;
+    --card-foreground:       220 20% 96%;
+    --popover:               220 16% 12%;
+    --popover-foreground:    220 20% 96%;
+    --muted:                 220 14% 16%;
+    --muted-foreground:      217 12% 62%;
+    --accent:                220 14% 18%;
+    --accent-foreground:     220 20% 96%;
+    --border:                218 14% 20%;
+    --input:                 218 14% 22%;
+    --ring:                  230 60% 68%;
+
+    --primary:               230 60% 68%;   /* indigo lifts on dark */
+    --primary-foreground:    220 25% 10%;
+    --secondary:             220 14% 18%;
+    --secondary-foreground:  220 20% 96%;
+    --destructive:           4 72% 62%;
+    --destructive-foreground:220 25% 10%;
+
+    --settled:               160 48% 48%;
+    --settled-foreground:    220 25% 10%;
+    --settled-subtle:        160 30% 16%;
+    --caution:               38 82% 58%;
+    --caution-foreground:    220 25% 10%;
+    --caution-subtle:        38 40% 16%;
+    --machine-subtle:        230 30% 20%;
+    --marker-subtle:         4 32% 20%;
+
+    --viewer-surround:       220 10% 24%;
+
+    --ev-a: 230 60% 68%;
+    --ev-b: 160 48% 52%;
+    --ev-c: 38 82% 58%;
+    --ev-d: 275 55% 68%;
+    --ev-e: 190 60% 52%;
+    --ev-f: 25 45% 56%;
+    --ev-fill: 0.26;
+
+    --chart-1: 230 60% 68%;
+    --chart-2: 190 60% 52%;
+    --chart-3: 160 48% 52%;
+    --chart-4: 38 82% 58%;
+    --chart-5: 275 55% 68%;
+
+    --sidebar-background:        220 18% 10%;
+    --sidebar-foreground:        220 20% 96%;
+    --sidebar-primary:           230 60% 68%;
+    --sidebar-primary-foreground:220 25% 10%;
+    --sidebar-accent:            220 14% 16%;
+    --sidebar-accent-foreground: 220 20% 96%;
+    --sidebar-border:            218 14% 20%;
+    --sidebar-ring:              230 60% 68%;
+  }
+}
