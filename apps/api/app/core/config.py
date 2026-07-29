@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     jwt_access_ttl_seconds: int = 900
     jwt_refresh_ttl_seconds: int = 604800
 
-    database_url: str = "postgresql+psycopg://marking:marking@localhost:5432/marking"
+    # 5433 on the host — see the port comment in docker-compose.yml.
+    database_url: str = "postgresql+psycopg://marking:marking@localhost:5433/marking"
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint: str = "http://localhost:9000"
     s3_bucket: str = "marking-assistant"
