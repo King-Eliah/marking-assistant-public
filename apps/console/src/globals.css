@@ -1,0 +1,23 @@
+/* Console — desktop ≥1280 only. See .claude/rules/clients.md.
+ *
+ * Tokens are imported from @marking/ui, not redefined here: design.md §0 says
+ * build the token layer once. Values live in packages/ui/src/tokens.css and
+ * come from design.md §2.2 (light) and §2.3 (dark).
+ */
+
+@import "@marking/ui/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
