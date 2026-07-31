@@ -22,6 +22,14 @@ from __future__ import annotations
 
 from typing import Final
 
+#: Bump on any change to a dimension in this file.
+#:
+#: Recorded against every issued booklet. A booklet printed under one geometry
+#: and detected under another produces a warp that looks entirely valid and
+#: maps onto the wrong coordinates — a silent failure that would attribute
+#: handwriting to the wrong question. A recorded version makes it loud instead.
+LAYOUT_VERSION: Final[str] = "1.0"
+
 #: ReportLab works in points. 72 pt = 1 inch = 25.4 mm.
 MM_TO_PT: Final[float] = 72.0 / 25.4
 
