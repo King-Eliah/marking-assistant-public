@@ -43,13 +43,20 @@ def _clean_engine() -> None:
     _reset_engine()
 
 
-def test_the_app_role_passes_the_guard() -> None:
+def test_the_app_role_passes_the_guard(app_engine: Engine) -> None:
+    """Takes `app_engine` purely so it skips rather than fails when no database
+    is reachable — consistent with every other integration test. Without it a
+    stopped Docker looks like a broken guard."""
+    del app_engine
     _reset_engine()
     assert_rls_applies()
 
 
-def test_connecting_as_the_owner_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_connecting_as_the_owner_is_refused(
+    owner_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The exact misconfiguration that leaked, now caught before serving."""
+    del owner_engine
     from app.core import config, db
 
     _reset_engine()
@@ -65,8 +72,9 @@ def test_connecting_as_the_owner_is_refused(monkeypatch: pytest.MonkeyPatch) -> 
         config.get_settings.cache_clear()
 
 
-def test_the_two_urls_are_actually_different_roles() -> None:
+def test_the_two_urls_are_actually_different_roles(owner_engine: Engine) -> None:
     """Guards against a future edit collapsing them back into one."""
+    del owner_engine
     assert "marking_app:" in APP_URL
     assert "marking_app:" not in OWNER_URL
 
