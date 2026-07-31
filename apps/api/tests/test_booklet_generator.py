@@ -21,9 +21,12 @@ from pypdf import PdfReader
 from app.engines.booklet.generator import (
     BookletSpec,
     QuestionSlot,
+    _paginate,
+    _usable_height_mm,
     format_marks,
     generate,
 )
+from app.engines.booklet.layout import CONTENT_MARGIN_MM
 from app.engines.booklet.payload import BookletPayload, decode
 
 BOOKLET = uuid.UUID("11111111-2222-3333-4444-555555555555")
@@ -88,6 +91,49 @@ def test_it_paginates_when_questions_exceed_one_page() -> None:
     tall = [QuestionSlot(f"Q{i}", Decimal("5"), height_mm=90) for i in range(1, 7)]
     pdf = generate(spec(questions=tall))
     assert page_count(pdf) >= 3
+
+
+def test_no_question_box_runs_off_the_bottom_of_a_page() -> None:
+    """Page 1 is 26 mm shorter than the others because of the identity box.
+
+    Pagination originally assumed a uniform page height, which pushed the last
+    box on page 1 past the bottom edge. Nothing about the page count looked
+    wrong — it would have been discovered by a student meeting a truncated
+    answer box in the exam hall.
+    """
+    bottom_limit = CONTENT_MARGIN_MM
+
+    for heights in (
+        [50, 45, 90, 70, 110],  # the sample booklet, which did overflow
+        [25] * 12,
+        [90, 90, 90],
+        [180, 180],
+        [181],
+    ):
+        slots = [
+            QuestionSlot(f"Q{i}", Decimal("5"), height_mm=float(h))
+            for i, h in enumerate(heights, start=1)
+        ]
+        for page_no, page in enumerate(_paginate(spec(questions=slots)), start=1):
+            used = sum(s.height_mm + 6.0 for s in page)
+            available = _usable_height_mm(page_no)
+            assert used <= available + 0.01, (
+                f"page {page_no} of {heights} overflows by {used - available:.1f}mm"
+            )
+        assert bottom_limit > 0  # sanity: the margin is a real constraint
+
+
+def test_the_first_page_holds_less_than_the_others() -> None:
+    """A direct statement of the asymmetry, so a future edit that flattens it
+    fails here rather than in print."""
+    assert _usable_height_mm(1) < _usable_height_mm(2)
+    assert _usable_height_mm(2) == _usable_height_mm(3)
+
+
+def test_a_question_too_tall_for_page_one_moves_to_page_two() -> None:
+    tall = QuestionSlot("1", Decimal("10"), height_mm=181)
+    pages = _paginate(spec(questions=[tall, QuestionSlot("2", Decimal("5"), height_mm=40)]))
+    assert len(pages) == 2
 
 
 # --- anonymity -------------------------------------------------------------
