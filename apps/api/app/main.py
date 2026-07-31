@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -39,6 +40,24 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     lifespan=lifespan,
+)
+
+# The clients are served from a different origin in development (Vite on 5173,
+# the API on 8000), so a browser sends a preflight before every non-simple
+# request. Without this the preflight is answered 405 and the real request is
+# never made — which surfaces in the client as a network error rather than an
+# HTTP status, and so cannot be told apart from the server being down.
+#
+# `allow_credentials` is required because the refresh token is an httpOnly
+# cookie. That in turn forbids a wildcard origin: the browser refuses the
+# combination, and rightly, since it would let any site make authenticated
+# calls on behalf of a signed-in user.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

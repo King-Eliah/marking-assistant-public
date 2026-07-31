@@ -52,6 +52,22 @@ export class OfflineError extends Error {
   }
 }
 
+/**
+ * The request never completed, so there is no status to report.
+ *
+ * `fetch` rejects with a bare TypeError for a refused connection, a DNS
+ * failure and a blocked CORS preflight alike — the browser deliberately
+ * withholds the detail from script. Reporting "something went wrong" for all
+ * three is what made a missing CORS header take a browser session to find,
+ * when the message could have pointed at the API instead.
+ */
+export class NetworkError extends Error {
+  constructor() {
+    super("Could not reach the server. Check it is running, then try again.");
+    this.name = "NetworkError";
+  }
+}
+
 type RequestOptions = {
   method?: string;
   body?: unknown;
@@ -82,7 +98,13 @@ async function raw(path: string, options: RequestOptions = {}): Promise<Response
   if (body !== undefined) init.body = JSON.stringify(body);
   if (signal !== undefined) init.signal = signal;
 
-  return fetch(`${BASE}${path}`, init);
+  try {
+    return await fetch(`${BASE}${path}`, init);
+  } catch (caught) {
+    // An AbortError is the caller cancelling on purpose, not a failure.
+    if (caught instanceof DOMException && caught.name === "AbortError") throw caught;
+    throw new NetworkError();
+  }
 }
 
 async function toError(response: Response): Promise<ApiError> {

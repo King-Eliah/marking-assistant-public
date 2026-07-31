@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { AuthCard, AuthLayout } from "@/components/auth-card";
-import { ApiError, OfflineError } from "@/lib/api";
+import { ApiError, NetworkError, OfflineError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 /**
@@ -36,7 +36,7 @@ export function SignInPage() {
       await signIn(email, password, rememberMe);
       navigate("/home", { replace: true });
     } catch (caught) {
-      if (caught instanceof OfflineError) {
+      if (caught instanceof OfflineError || caught instanceof NetworkError) {
         setError(caught.message);
       } else if (caught instanceof ApiError) {
         setError(caught.message);
