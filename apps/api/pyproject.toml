@@ -18,6 +18,17 @@ dependencies = [
     # JWT RS256. Neither is reachable with the standard library.
     "argon2-cffi==23.1.0",
     "pyjwt[crypto]==2.10.1",
+    # Booklet generation and Engine 1 (spec.md §1.1, ENGINE 1).
+    # opencv-*contrib* specifically: cv2.aruco lives in contrib, and both the
+    # generator here and the detector in stage 3 need the same dictionary.
+    "opencv-contrib-python-headless==4.10.0.84",
+    "numpy==2.2.1",
+    # 5.x rather than 4.x: 4.2.5 emits a DeprecationWarning on import under
+    # Python 3.12 (ast.NameConstant), which `filterwarnings = ["error"]` turns
+    # into a collection failure. Suppressing it would blunt a check that has
+    # already caught a real connection leak.
+    "reportlab==5.0.0",
+    "qrcode[pil]==8.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +38,9 @@ dev = [
     "httpx==0.28.1",
     "ruff==0.9.1",
     "mypy==1.14.1",
+    # Test-only. PDF content streams are compressed, so asserting on generated
+    # text needs a real reader rather than a byte search.
+    "pypdf==5.1.0",
 ]
 
 [build-system]
@@ -51,7 +65,9 @@ warn_unreachable = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["dramatiq.*"]
+# Third-party packages that ship no type information. Scoped per module rather
+# than set globally, so a genuinely untyped import elsewhere still fails.
+module = ["dramatiq.*", "reportlab.*", "qrcode.*", "pypdf.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
