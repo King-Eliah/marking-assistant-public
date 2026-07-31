@@ -28,7 +28,7 @@ from typing import Final
 #: and detected under another produces a warp that looks entirely valid and
 #: maps onto the wrong coordinates — a silent failure that would attribute
 #: handwriting to the wrong question. A recorded version makes it loud instead.
-LAYOUT_VERSION: Final[str] = "1.0"
+LAYOUT_VERSION: Final[str] = "1.1"
 
 #: ReportLab works in points. 72 pt = 1 inch = 25.4 mm.
 MM_TO_PT: Final[float] = 72.0 / 25.4
@@ -119,6 +119,56 @@ CONTENT_WIDTH_MM: Final[float] = PAGE_WIDTH_MM - 2 * CONTENT_MARGIN_MM
 
 QR_SIZE_MM: Final[float] = 26.0
 HEADER_HEIGHT_MM: Final[float] = 30.0
+
+# --- identity region -------------------------------------------------------
+
+#: Where the student writes their index number. Page 1 only.
+#:
+#: Its position is fixed so the region can be cropped out by coordinate rather
+#: than by detection. That is the whole mechanism: the marker is never sent
+#: these pixels, so anonymity is enforced by geometry rather than by anyone
+#: remembering to look away.
+IDENTITY_BOX_HEIGHT_MM: Final[float] = 20.0
+IDENTITY_BOX_WIDTH_MM: Final[float] = 78.0
+
+
+def identity_region_mm(header_bottom_mm: float) -> tuple[float, float, float, float]:
+    """`(x, y, width, height)` of the identity box, from the page's bottom-left.
+
+    Returned as plain millimetres so Engine 1 can convert to pixels using the
+    DPI it measured, rather than either side hard-coding a pixel offset that
+    would silently be wrong at a different capture resolution.
+    """
+    return (
+        CONTENT_MARGIN_MM,
+        header_bottom_mm - IDENTITY_BOX_HEIGHT_MM,
+        IDENTITY_BOX_WIDTH_MM,
+        IDENTITY_BOX_HEIGHT_MM,
+    )
+
+
+#: Distance from the top of the content area to the bottom of the header band.
+#: Kept here rather than computed in the generator so the crop and the drawing
+#: cannot drift apart.
+HEADER_BOTTOM_MM: Final[float] = PAGE_HEIGHT_MM - CONTENT_MARGIN_MM - QR_SIZE_MM - 8.0
+
+
+def identity_region_px(dpi: float, page_height_px: int) -> tuple[int, int, int, int]:
+    """The identity region in image pixels, top-left origin.
+
+    Engine 1 warps a photograph onto the known page rectangle, so once warped
+    this rectangle is exact rather than approximate.
+    """
+    px_per_mm = dpi / 25.4
+    x_mm, y_mm, w_mm, h_mm = identity_region_mm(HEADER_BOTTOM_MM)
+
+    x = int(round(x_mm * px_per_mm))
+    width = int(round(w_mm * px_per_mm))
+    height = int(round(h_mm * px_per_mm))
+    # PDF measures from the bottom; images from the top.
+    y = page_height_px - int(round((y_mm + h_mm) * px_per_mm))
+    return x, y, width, height
+
 
 # --- question boxes --------------------------------------------------------
 

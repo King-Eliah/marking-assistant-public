@@ -187,7 +187,14 @@ def test_two_booklets_produce_different_pdfs(exam) -> None:
     assert pdfs[0] != pdfs[1]
 
 
-def test_the_pdf_carries_no_student_identity(exam) -> None:
+def test_the_pdf_asks_for_an_index_number_but_not_a_name(exam) -> None:
+    """Anonymity here is achieved by cropping, not by omission.
+
+    The student writes their index number plainly — anything else would need a
+    change to how exams are run. What makes marking anonymous is that Engine 1
+    removes that region before a marker is ever sent the page, so the booklet
+    itself is expected to contain the words this test looks for.
+    """
     tenant, user, exam_id, _ = exam
     created = client.post(
         f"/exams/{exam_id}/booklets", json={"count": 1}, headers=auth(tenant, user)
@@ -196,9 +203,31 @@ def test_the_pdf_carries_no_student_identity(exam) -> None:
     pdf = client.get(f"/booklets/{created['id']}.pdf", headers=auth(tenant, user)).content
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
 
+    assert "INDEX NUMBER" in text
     assert "not write your name" in text
-    for banned in ("student", "candidate", "index number"):
+    assert "removed before marking" in text
+
+    # A name is the thing that must never be invited onto the page: it cannot
+    # be validated against a class list and it would identify the student to a
+    # marker if the crop ever failed.
+    for banned in ("full name", "surname", "candidate name"):
         assert banned not in text.lower()
+
+
+def test_the_identity_box_appears_only_on_the_first_page(exam) -> None:
+    """Repeating it would give a marker several chances to see an identity the
+    crop is only applied to once."""
+    tenant, user, exam_id, _ = exam
+    tall = client.post(
+        f"/exams/{exam_id}/booklets", json={"count": 1}, headers=auth(tenant, user)
+    ).json()[0]
+
+    pdf = client.get(f"/booklets/{tall['id']}.pdf", headers=auth(tenant, user)).content
+    pages = [p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages]
+
+    assert "INDEX NUMBER" in pages[0]
+    for later in pages[1:]:
+        assert "INDEX NUMBER" not in later
 
 
 def test_the_printed_marks_match_the_stored_questions(exam) -> None:

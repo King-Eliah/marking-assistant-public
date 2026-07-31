@@ -13,6 +13,7 @@ from app.models.academic import (
 )
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.identity import BookletIdentity, Enrolment
 from app.models.tenancy import Course, Role, Tenant, User, UserStatus
 
 __all__ = [
@@ -20,7 +21,9 @@ __all__ = [
     "AuditLog",
     "Base",
     "Booklet",
+    "BookletIdentity",
     "Course",
+    "Enrolment",
     "Exam",
     "ExamStatus",
     "Question",
