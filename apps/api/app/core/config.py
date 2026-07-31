@@ -5,16 +5,30 @@ spec.md Appendix A. Nothing is read from the environment outside this module.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: apps/api/app/core/config.py -> apps/api/app/core -> ... -> repository root
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+#: Both locations are searched, later entries winning.
+#:
+#: Resolved from this file rather than written as a bare `".env"`, which
+#: pydantic-settings resolves against the *working directory*. Everything here
+#: runs from `apps/api` while `.env` lives at the repository root, so the bare
+#: form silently found nothing and every setting quietly used its default —
+#: including `DATABASE_URL`, which is how an unnoticed misconfiguration could
+#: have pointed the application at the wrong role.
+_ENV_FILES = (_REPO_ROOT / ".env", _REPO_ROOT / "apps" / "api" / ".env")
 
 
 class Settings(BaseSettings):
     """Environment configuration. See docs/spec.md Appendix A."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -58,6 +72,29 @@ class Settings(BaseSettings):
     reranker_model: str = "bge-reranker-v2-m3@1.0"
     nli_model: str = "deberta-v3-base-mnli@1.0"
     prompt_version: str = "v3"
+
+    # --- provider credentials
+    #
+    # Never literals in code or in a committed file. `.env` is gitignored;
+    # anything deployed reads these from a secret manager. A key in git history
+    # is a key that has to be rotated, and rotating a Google service account
+    # means every worker restarts.
+    #
+    #: Absolute path to the service-account JSON downloaded from Google Cloud.
+    #: The path, not the contents — the file itself must stay outside the repo.
+    google_application_credentials: str = ""
+    #: From https://aistudio.google.com/apikey
+    gemini_api_key: str = ""
+
+    @property
+    def has_ocr_credentials(self) -> bool:
+        """Whether a real OCR call is possible.
+
+        Checked at the point of use rather than at startup: the whole booklet,
+        capture and evaluation path works without any provider, and refusing to
+        boot over a missing key would block work that does not need one.
+        """
+        return bool(self.google_application_credentials or self.gemini_api_key)
 
     # --- providers
     ocr_primary: str = "google_vision"
