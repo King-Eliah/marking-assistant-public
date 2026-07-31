@@ -73,6 +73,14 @@
     --sidebar-ring:              230 38% 48%;
 
     --radius: 0.375rem;   /* 6px — controls */
+
+    /* elevation — design.md §4.3. Borders do most of the work; shadows are a
+     * last resort. Cards in a list get a border and no shadow: twelve
+     * shadowed cards in a grid is the most reliable tell of a templated
+     * design. */
+    --shadow-1: 0 1px 2px hsl(220 20% 12% / .06);
+    --shadow-2: 0 2px 4px hsl(220 20% 12% / .06), 0 8px 16px hsl(220 20% 12% / .06);
+    --shadow-3: 0 8px 24px hsl(220 20% 12% / .12), 0 2px 6px hsl(220 20% 12% / .08);
   }
 }
 
@@ -132,5 +140,11 @@
     --sidebar-accent-foreground: 220 20% 96%;
     --sidebar-border:            218 14% 20%;
     --sidebar-ring:              230 60% 68%;
+
+    /* design.md §4.3: shadows barely register on dark. A 1px lighter top
+     * border carries elevation instead, so these stay deliberately faint. */
+    --shadow-1: 0 1px 2px hsl(220 30% 2% / .40);
+    --shadow-2: 0 2px 4px hsl(220 30% 2% / .40), 0 8px 16px hsl(220 30% 2% / .30);
+    --shadow-3: 0 8px 24px hsl(220 30% 2% / .55), 0 2px 6px hsl(220 30% 2% / .40);
   }
 }
