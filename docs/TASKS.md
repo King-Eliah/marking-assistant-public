@@ -27,14 +27,18 @@ position available and it is also simply true.
 ## Current position
 
 - [x] **Stage 0 — Scaffold** — complete
-- [x] **Stage 1 — Platform spine** — complete, gate closed end to end
-- [ ] **Stage 2 — Booklet generator** ← in progress
+- [x] **Stage 1 — Platform spine** — complete, isolation gate closed end to end
+- [x] **Stage 2 — Booklet generator** — complete, **gate closed on real printed paper**
+- [x] **Stage 3 — Engine 1, ingestion** — complete, validated on real photographs
+- [ ] **Stage 4 — Engine 2, OCR** ← next
 
-25 commits. **348 backend tests, 6 frontend**, ruff and mypy clean.
+36 commits. **512 backend tests, 6 frontend**, ruff and mypy clean.
 
 Built so far: pipeline state machine, tenancy models, RLS + app role + audit immutability,
 service-layer guard, hash-chained audit writer, argon2id + RS256 auth, `GET`/`LIST /courses`,
-console shell with sign-in and an empty home.
+booklet generator with issue and download endpoints, encrypted student identity map, the
+capture quality gate, homography rectification, page identification, and Engine 1 assembled
+end to end. Console shell with sign-in and an empty home.
 
 **CI is suspended at the GitHub account level** — an unpaid $6.64 Copilot invoice puts the
 account in billing failure, which stops Actions on every repo. Not a workflow defect: a
@@ -49,6 +53,12 @@ runs the same gates locally in the meantime.
       them. Target 100 pages, 250 transcribed lines, 60 dual-marked answers. Scaled down from
       spec.md's 200/500/150 to fit the clock. **Every accuracy number in week 3 depends on this
       existing by end of week 1.**
+
+      **Capture requirement, measured:** the page must span ~80% of the frame, or the camera
+      must be set above 4 MP. The reference photographs came in at 47–93 DPI against a 120 DPI
+      floor, entirely because the page filled only 55–61% of the frame at 2 MP. A whole golden
+      set captured that way would be unusable, so check the first few through the quality gate
+      before photographing three hundred.
 - [ ] **Provider billing.** Google Vision and Gemini keys, payment verified. Risk register rates
       this Medium/High. If it fails on day 6 it costs a third of the remaining time. **The same
       declining card already broke GitHub Actions — resolve the card, not just the invoice.**
@@ -87,18 +97,41 @@ looked correct until tested:
 3. **`TRUNCATE` bypassed audit immutability.** A `FOR EACH ROW` trigger does not fire on
    `TRUNCATE`, so the entire log was wipeable in one statement. Statement-level trigger added.
 
-### Stage 2 — Booklet generator
-- [ ] A4 PDF: 4 ArUco fiducials, QR `{booklet_uuid, page_no, page_total, exam_id}`, question
+### Stage 2 — Booklet generator — **complete**
+- [x] A4 PDF: 4 ArUco fiducials, QR `{booklet_uuid, page_no, page_total, exam_id}`, question
       boxes with declared max marks, anonymous UUID
+- [x] Answer box heights derived from marks; leftover page space shared by marks
+- [x] Index-number region on page 1, cropped before marking
+- [x] `POST /exams/{id}/booklets`, `GET /booklets/{id}.pdf`, listing
 
-**Gate:** a printed booklet's QR decodes from a phone photo; all four fiducials detect at 150 DPI.
+**Gate — passed on real paper.** A booklet printed on a real printer and photographed on a
+phone: all four fiducials found on every one of six photographs, and the QR decoded back to
+exactly the UUIDs the generator wrote. Those photographs are in the test suite.
 
-### Stage 3 — Engine 1, ingestion
-- [ ] Fiducial detection, homography warp, deskew, normalise to `WORK_LONG_EDGE`
-- [ ] Quality gate with actionable rejection messages
-- [ ] Plain-paper fallback **cut** — booklets only
+### Stage 3 — Engine 1, ingestion — **complete**
+- [x] Fiducial detection, homography rectification, deskew
+- [x] Quality gate with actionable rejection messages
+- [x] Page identification from the rectified QR
+- [x] Identity-region redaction by coordinate
+- [x] `ingest()` assembling the whole engine
+- [x] Plain-paper fallback **cut** — booklets only
 
-**Gate:** ≥95% of golden photographs warp correctly.
+**Gate:** deferred to the golden set. The ≥95% warp figure needs golden photographs to measure
+against; rectification is validated on the reference photographs in the meantime.
+
+**What the real paper taught us**, all of it now encoded in thresholds rather than guesses:
+
+- **The QR needs 120 DPI, not 90.** Sweeping a real photograph through scale decoded at 79, 63
+  and 48 DPI but failed at 71, 56 and 40 — non-monotonic, because the module grid sometimes
+  aligns with the pixel grid. Below ~100 DPI success is luck, so the gate sits where decoding
+  is *reliable*.
+- **Rectify before decoding.** A page failed to decode raw and succeeded once flattened.
+  Perspective correction is worth real resolution to the decoder.
+- **Fiducials are far more robust than the QR.** 12mm 4x4 markers were found at 47 DPI — a
+  third of the intended resolution — while the QR needed nearly three times that.
+- **Overexposure cannot be judged by mean brightness.** A booklet page is mostly white paper:
+  a lightly-written page measures 250 and a blown-out one 252. Clipping fraction is the honest
+  signal.
 
 ---
 
