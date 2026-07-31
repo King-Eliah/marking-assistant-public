@@ -25,7 +25,7 @@ COMPOSE := docker compose
 
 .DEFAULT_GOAL := help
 .PHONY: help venv install dev down clean logs test test-api test-web lint lint-api \
-        lint-web typecheck typecheck-api typecheck-web fmt migrate seed evaluate build ci
+        lint-web typecheck typecheck-api typecheck-web fmt migrate seed evaluate \n        evaluate-strict build ci
 
 help: ## List targets
 	@echo Marking Assistant
@@ -107,8 +107,15 @@ migrate: ## Apply database migrations
 seed: ## Load development fixtures
 	@echo seed: nothing to load yet - fixtures arrive with the first models at stage 1 (docs/TASKS.md)
 
+# No `cd` here, unlike migrate: the api package is pip-installed editable, so
+# `app` imports from any directory, and the CLI resolves the golden set from
+# its own location. Avoiding the `cd` also avoids a relative Windows path,
+# which cmd.exe accepts and sh silently mangles.
 evaluate: ## CER/WER/QWK against the golden set
-	@echo evaluate: no golden set yet - this is the stage 4 gate (docs/TASKS.md)
+	$(PY) -m app.evaluation.cli $(ARGS)
+
+evaluate-strict: ## As above, but exit non-zero unless every gate passes
+	$(PY) -m app.evaluation.cli --strict $(ARGS)
 
 build: ## Production build of both clients
 	pnpm -r --if-present build
