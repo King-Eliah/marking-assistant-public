@@ -199,6 +199,26 @@ QUESTION_BOX_MAX_HEIGHT_MM: Final[float] = (
 #: segmentation on unlined prose.
 RULE_SPACING_MM: Final[float] = 8.0
 
+#: Writing lines allowed per mark, when a height is not stated explicitly.
+#:
+#: Prose answers at degree level need roughly two lines per mark — a 10-mark
+#: question is a paragraph or two, not ten lines. The first version of this
+#: file gave about one line per mark, which produced booklets a student would
+#: run out of room in, and running out of room is a mark lost to stationery
+#: rather than to knowledge.
+LINES_PER_MARK: Final[float] = 1.75
+
+
+def suggested_answer_height_mm(max_marks: float) -> float:
+    """Default box height for a question worth `max_marks`.
+
+    Capped at what fits on a page. A question needing more room than one page
+    should be split by its author rather than silently given less space than
+    its marks imply.
+    """
+    height = QUESTION_BOX_TITLE_HEIGHT_MM + max_marks * LINES_PER_MARK * RULE_SPACING_MM
+    return min(max(height, QUESTION_BOX_MIN_HEIGHT_MM), QUESTION_BOX_MAX_HEIGHT_MM)
+
 
 def expected_dpi(pixel_width: int) -> float:
     """Effective DPI of a photograph, given its width in pixels.

@@ -37,6 +37,7 @@ from app.engines.booklet.layout import (
     RULE_SPACING_MM,
     fiducial_origins_mm,
     mm,
+    suggested_answer_height_mm,
 )
 from app.engines.booklet.markers import marker_bitmap
 from app.engines.booklet.payload import BookletPayload
@@ -57,15 +58,22 @@ def format_marks(value: Decimal) -> str:
 
 @dataclass(frozen=True, slots=True)
 class QuestionSlot:
-    """One printed answer region with its declared maximum."""
+    """One printed answer region with its declared maximum.
+
+    `height_mm` is a *minimum*. Leave it unset and it is derived from the
+    marks, which is almost always what an author wants — guessing millimetres
+    per question is not a useful thing to ask a lecturer to do.
+    """
 
     number: str  # "3(a)"
     max_marks: Decimal
-    height_mm: float = QUESTION_BOX_MIN_HEIGHT_MM
+    height_mm: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.number.strip():
             raise ValueError("question number cannot be blank")
+        if self.height_mm == 0.0:
+            object.__setattr__(self, "height_mm", suggested_answer_height_mm(float(self.max_marks)))
         if self.max_marks <= 0:
             raise ValueError(f"max_marks must be positive, got {self.max_marks}")
         if self.height_mm < QUESTION_BOX_MIN_HEIGHT_MM:
@@ -230,9 +238,15 @@ def _draw_identity_box(pdf: canvas.Canvas, bottom_of_header: float) -> float:
     return bottom - mm(6)
 
 
-def _draw_question_box(pdf: canvas.Canvas, slot: QuestionSlot, top_y: float) -> float:
-    """Draw one question region. Returns the y below it."""
-    height = mm(slot.height_mm)
+def _draw_question_box(
+    pdf: canvas.Canvas, slot: QuestionSlot, top_y: float, height_mm: float | None = None
+) -> float:
+    """Draw one question region. Returns the y below it.
+
+    `height_mm` is the fitted height from `_fit_to_page`, which may exceed the
+    slot's requested minimum.
+    """
+    height = mm(height_mm if height_mm is not None else slot.height_mm)
     left = mm(CONTENT_MARGIN_MM)
     width = mm(CONTENT_WIDTH_MM)
     bottom = top_y - height
@@ -310,6 +324,45 @@ def _paginate(spec: BookletSpec) -> list[list[QuestionSlot]]:
     return pages
 
 
+#: A question's box may grow by at most this multiple of its requested height.
+#:
+#: Without a ceiling, one short question alone on a final page would inflate to
+#: fill the whole sheet — twenty lines for a two-mark answer, which misleads a
+#: student about how much is wanted just as surely as too little room does.
+_MAX_EXPANSION = 2.5
+
+
+def _fit_to_page(page: list[QuestionSlot], page_no: int) -> list[tuple[QuestionSlot, float]]:
+    """Return each slot with the height it should actually be drawn at.
+
+    Leftover vertical space is shared out in proportion to marks, so a page
+    holding a 4-mark and a 12-mark question gives most of the slack to the
+    12-mark one. Blank space at the bottom of a page is space a student cannot
+    write in, and every page costs a photograph to capture.
+
+    The requested height on the slot is left untouched — it is the author's
+    stated minimum. This returns a rendering decision, not a change to the
+    specification.
+    """
+    used = sum(slot.height_mm + _SLOT_GAP_MM for slot in page)
+    spare = _usable_height_mm(page_no) - used
+    if spare <= 0.5:
+        return [(slot, slot.height_mm) for slot in page]
+
+    total_marks = sum(float(slot.max_marks) for slot in page)
+    fitted: list[tuple[QuestionSlot, float]] = []
+    remaining_spare = spare
+
+    for slot in page:
+        share = spare * (float(slot.max_marks) / total_marks) if total_marks else 0.0
+        ceiling = slot.height_mm * _MAX_EXPANSION - slot.height_mm
+        grown = min(share, ceiling, remaining_spare)
+        remaining_spare -= grown
+        fitted.append((slot, slot.height_mm + grown))
+
+    return fitted
+
+
 def generate(spec: BookletSpec) -> bytes:
     """Render a complete booklet as PDF bytes.
 
@@ -348,8 +401,8 @@ def generate(spec: BookletSpec) -> bytes:
         if index == 1:
             y = _draw_identity_box(pdf, y)
 
-        for slot in slots:
-            y = _draw_question_box(pdf, slot, y)
+        for slot, fitted_height in _fit_to_page(slots, index):
+            y = _draw_question_box(pdf, slot, y, fitted_height)
 
         pdf.showPage()
 
