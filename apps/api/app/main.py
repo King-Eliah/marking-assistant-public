@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.core.config import Settings, get_settings
 from app.core.db import assert_rls_applies
 from app.core.scope import NotFoundError
-from app.routers import booklets, courses
+from app.routers import auth, booklets, courses
 
 logger = logging.getLogger(__name__)
 
@@ -76,5 +76,6 @@ def healthz() -> Health:
     )
 
 
+app.include_router(auth.router)
 app.include_router(courses.router)
 app.include_router(booklets.router)
