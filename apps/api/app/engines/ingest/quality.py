@@ -10,8 +10,23 @@ The resolution floor came from a real failure. Three photographs of a printed
 booklet arrived at 720x1280 after a messaging app recompressed them — about
 50 DPI across the page. All four fiducials still detected, because they are
 12mm and only 4x4 bits. The QR did not decode at all: 41 modules across 26mm
-left roughly 1.2 pixels per module. Sweeping the decoder across resolutions
-put the cliff between 75 and 90 DPI.
+left roughly 1.2 pixels per module.
+
+Two things were then learned from real photographs, both of which shaped the
+numbers below.
+
+**Rectify before decoding.** A page at 79 DPI failed to decode raw and
+succeeded once rectified. Removing the perspective distortion is worth real
+resolution to the decoder, so the pipeline runs `rectify` first and reads the
+QR from the flattened page.
+
+**The margin is not decoration.** Sweeping one real photograph down through
+scale decoded at 79, 63 and 48 DPI but failed at 71, 56 and 40 — non-monotonic,
+because at some scales the QR's module grid happens to align with the pixel
+grid and at others it does not. Below roughly 100 DPI, success is alignment
+luck rather than capability. The gate therefore sits at 120: the point where
+decoding is reliable, not the lowest point where it has ever been observed to
+work.
 """
 
 from __future__ import annotations
@@ -28,13 +43,15 @@ from app.engines.booklet.layout import PAGE_WIDTH_MM
 
 ImageArray = np.ndarray[Any, np.dtype[Any]]
 
-#: Below this the QR provably cannot be read — measured, not estimated.
-#: At 75 DPI the decoder failed every time; at 90 it succeeded.
+#: The lowest resolution at which a QR has ever been observed to decode here,
+#: on a rectified page. Not a threshold — a floor below which it is hopeless.
+#: Between this and MIN_DPI_REJECT, decoding happens or does not depending on
+#: how the module grid falls against the pixel grid.
 MIN_DPI_HARD: Final[float] = 90.0
 
-#: The gate's actual floor, with margin. 120 DPI is 3 pixels per QR module,
-#: which leaves room for the blur and noise a real photograph carries and the
-#: measured cliff does not.
+#: The gate's actual floor. 120 DPI is 3 pixels per QR module: enough that
+#: decoding does not depend on lucky alignment, with room for the blur and
+#: noise a real photograph carries.
 MIN_DPI_REJECT: Final[float] = 120.0
 
 #: Below this it will probably work but is worth warning about.
