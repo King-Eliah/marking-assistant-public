@@ -26,10 +26,20 @@ position available and it is also simply true.
 
 ## Current position
 
-- [x] **Stage 0 — Scaffold** — complete, 10 commits, CI blocked on `workflow` token scope
-- [ ] **Stage 1 — Platform spine** ← in progress
+- [x] **Stage 0 — Scaffold** — complete
+- [x] **Stage 1 — Platform spine** — complete, gate closed end to end
+- [ ] **Stage 2 — Booklet generator** ← in progress
 
-Nothing in `apps/` contains product logic yet.
+25 commits. **348 backend tests, 6 frontend**, ruff and mypy clean.
+
+Built so far: pipeline state machine, tenancy models, RLS + app role + audit immutability,
+service-layer guard, hash-chained audit writer, argon2id + RS256 auth, `GET`/`LIST /courses`,
+console shell with sign-in and an empty home.
+
+**CI is suspended at the GitHub account level** — an unpaid $6.64 Copilot invoice puts the
+account in billing failure, which stops Actions on every repo. Not a workflow defect: a
+seven-line probe workflow failed identically, as does GitHub's own dependabot job. `make ci`
+runs the same gates locally in the meantime.
 
 ---
 
@@ -40,23 +50,42 @@ Nothing in `apps/` contains product logic yet.
       spec.md's 200/500/150 to fit the clock. **Every accuracy number in week 3 depends on this
       existing by end of week 1.**
 - [ ] **Provider billing.** Google Vision and Gemini keys, payment verified. Risk register rates
-      this Medium/High. If it fails on day 6 it costs a third of the remaining time.
-- [ ] `gh auth refresh -h github.com -s workflow`, so CI can run.
+      this Medium/High. If it fails on day 6 it costs a third of the remaining time. **The same
+      declining card already broke GitHub Actions — resolve the card, not just the invoice.**
+- [x] `gh auth refresh -h github.com -s workflow` — done; 25 commits pushed
+- [ ] **Settle the $6.64 GitHub invoice** to restore CI, and set a $0 Copilot budget at
+      https://github.com/settings/billing/budgets to stop it recurring.
+- [ ] **Delete `marking-assistant-public`** — it existed only to test a CI theory that turned
+      out to be wrong, and it is world-readable.
 
 ---
 
 ## Week 1 — the spine and the vision half
 
-### Stage 1 — Platform spine `M0`
-- [ ] Auth: JWT RS256, access + refresh
-- [ ] Two roles only: `LECTURER`, `ADMIN`. Full RBAC is out.
-- [ ] `tenant_id` on every table; Postgres RLS policies
-- [ ] Service-layer scope check — the second independent layer
-- [ ] Audit log with hash chain, verified on read
-- [ ] `transition()` implementing the corrected `ALLOWED` table (spec.md §4 v1.1)
+### Stage 1 — Platform spine `M0` — **complete**
+- [x] Auth: JWT RS256, access + refresh, argon2id passwords
+- [x] Two roles only: `LECTURER`, `ADMIN`. Full RBAC is out.
+- [x] `tenant_id` on every table; Postgres RLS policies + `marking_app` role
+- [x] Service-layer scope check — the second independent layer
+- [x] Audit log with hash chain, verified on read, immutable at the database
+- [x] `transition()` implementing the corrected `ALLOWED` table (spec.md §4 v1.1)
 
-**Gate:** cross-tenant access returns 404, appears in the audit log; every illegal state
-transition is rejected with an error, not a silent no-op.
+**Gate — passed.** Cross-tenant `GET /courses/{id}` returns 404, is indistinguishable from a
+missing row, and appears in the caller's audit chain, which still verifies afterwards. All 240
+undeclared state transitions raise.
+
+**Three defects found and fixed while proving it** — each worth knowing about, because each
+looked correct until tested:
+
+1. **RLS was inert.** The app connected as the migration owner, a superuser, which bypasses RLS
+   entirely. Policies existed, every query succeeded, and the only symptom was a listing
+   endpoint returning another institution's rows. `assert_rls_applies()` now refuses to start
+   as any role with `SUPERUSER` or `BYPASSRLS`.
+2. **A malformed IP could suppress an audit row.** `audit_log.ip` is `INET`; an unparseable
+   value aborted the whole append. Behind a proxy that value is attacker-controlled. The field
+   is discarded now — losing a column beats losing the row.
+3. **`TRUNCATE` bypassed audit immutability.** A `FOR EACH ROW` trigger does not fire on
+   `TRUNCATE`, so the entire log was wipeable in one statement. Statement-level trigger added.
 
 ### Stage 2 — Booklet generator
 - [ ] A4 PDF: 4 ArUco fiducials, QR `{booklet_uuid, page_no, page_total, exam_id}`, question
