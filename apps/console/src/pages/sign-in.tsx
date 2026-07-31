@@ -1,38 +1,55 @@
 import { Button, Input, Label } from "@marking/ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { AuthCard, AuthLayout } from "@/components/auth-card";
+import { ApiError, OfflineError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 /**
  * A1 · Sign in. frontend.md §A1.
  *
- * Not yet wired to the API — auth lands with stage 1f. The states below are
- * real, so wiring is a matter of replacing the submit handler.
+ * Four states, all specified: loading, error, locked, offline. The error text
+ * is identical for an unknown address and a wrong password, and matches what
+ * the API returns — two different wordings would be a second, subtler way to
+ * work out which accounts exist.
  */
 export function SignInPage() {
   const navigate = useNavigate();
+  const { status, signIn } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  useEffect(() => {
+    if (status === "signed-in") navigate("/home", { replace: true });
+  }, [status, navigate]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (offline) {
-      setError("You're offline. Sign-in needs a connection.");
-      return;
-    }
     setPending(true);
     setError(null);
-    // Placeholder until stage 1f. The identical-message rule below is the part
-    // that matters and is already correct.
-    setError("That email and password don't match. Try again, or reset your password.");
-    setPending(false);
-    void navigate;
+    try {
+      await signIn(email, password, rememberMe);
+      navigate("/home", { replace: true });
+    } catch (caught) {
+      if (caught instanceof OfflineError) {
+        setError(caught.message);
+      } else if (caught instanceof ApiError) {
+        setError(caught.message);
+      } else {
+        // Never the raw exception. A stack trace or a fetch message in the UI
+        // tells the user nothing and can leak internals.
+        setError("Something went wrong signing you in. Try again in a moment.");
+      }
+      setPending(false);
+    }
   }
+
+  const disabled = pending || status === "checking";
 
   return (
     <AuthLayout>
@@ -52,22 +69,24 @@ export function SignInPage() {
         }
       >
         <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="email">Institution email</Label>
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="username"
+              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={pending}
+              disabled={disabled}
               aria-invalid={error !== null}
+              aria-describedby={error ? "sign-in-error" : undefined}
               required
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between">
               <Label htmlFor="password">Password</Label>
               <Link
@@ -84,26 +103,34 @@ export function SignInPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={pending}
+              disabled={disabled}
               aria-invalid={error !== null}
+              aria-describedby={error ? "sign-in-error" : undefined}
               required
             />
           </div>
 
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" name="remember" className="size-4 accent-[hsl(var(--primary))]" />
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={disabled}
+              className="size-4 rounded-sm accent-[hsl(var(--primary))]"
+            />
             Keep me signed in on this device
           </label>
 
-          {/* One message for unknown user and wrong password alike — a distinct
-              "no such account" reply is an enumeration oracle. frontend.md §A1. */}
+          {/* role="alert" so a screen reader announces it without the user
+              having to go looking. Text, not a coloured panel: design.md §2.4
+              forbids a coloured background behind body text. */}
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p id="sign-in-error" role="alert" className="text-sm text-destructive">
               {error}
             </p>
           )}
 
-          <Button type="submit" block size="lg" disabled={pending}>
+          <Button type="submit" block size="lg" disabled={disabled}>
             {pending ? "Signing in…" : "Sign in"}
           </Button>
         </form>

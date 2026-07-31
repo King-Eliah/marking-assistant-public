@@ -115,6 +115,9 @@ importers:
       autoprefixer:
         specifier: 10.4.20
         version: 10.4.20(postcss@8.5.25)
+      fast-glob:
+        specifier: 3.3.3
+        version: 3.3.3
       jsdom:
         specifier: 25.0.1
         version: 25.0.1
