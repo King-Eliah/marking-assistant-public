@@ -30,6 +30,7 @@ from app.engines.booklet.layout import (
     PAGE_HEIGHT_MM,
     PAGE_WIDTH_MM,
     QR_SIZE_MM,
+    QUESTION_BOX_MAX_HEIGHT_MM,
     QUESTION_BOX_MIN_HEIGHT_MM,
     QUESTION_BOX_PADDING_MM,
     QUESTION_BOX_TITLE_HEIGHT_MM,
@@ -70,6 +71,12 @@ class QuestionSlot:
         if self.height_mm < QUESTION_BOX_MIN_HEIGHT_MM:
             raise ValueError(
                 f"height {self.height_mm}mm is below the {QUESTION_BOX_MIN_HEIGHT_MM}mm minimum"
+            )
+        if self.height_mm > QUESTION_BOX_MAX_HEIGHT_MM:
+            raise ValueError(
+                f"height {self.height_mm}mm exceeds the {QUESTION_BOX_MAX_HEIGHT_MM}mm maximum "
+                f"that fits on a page. Split this into two questions rather than "
+                f"printing a box that runs off the paper."
             )
 
 
@@ -260,6 +267,24 @@ def _draw_question_box(pdf: canvas.Canvas, slot: QuestionSlot, top_y: float) -> 
     return bottom - mm(6)
 
 
+#: Vertical gap below each question box.
+_SLOT_GAP_MM = 6.0
+
+
+def _usable_height_mm(page_no: int) -> float:
+    """Space available for question boxes on a given page.
+
+    Page 1 is shorter than the rest: the identity box takes 20 mm plus its
+    gap. Assuming a uniform height here silently overflows the last box on
+    page 1 off the bottom of the paper — which is invisible in the page count
+    and only discovered when a student meets a truncated answer box.
+    """
+    usable = PAGE_HEIGHT_MM - 2 * CONTENT_MARGIN_MM - QR_SIZE_MM - 8
+    if page_no == 1:
+        usable -= IDENTITY_BOX_HEIGHT_MM + _SLOT_GAP_MM
+    return usable
+
+
 def _paginate(spec: BookletSpec) -> list[list[QuestionSlot]]:
     """Split questions into pages by available height.
 
@@ -267,18 +292,16 @@ def _paginate(spec: BookletSpec) -> list[list[QuestionSlot]]:
     encoded — a QR claiming "page 1 of 3" on a booklet that turns out to be
     four pages long would make missing-page detection actively wrong.
     """
-    usable = PAGE_HEIGHT_MM - 2 * CONTENT_MARGIN_MM - QR_SIZE_MM - 8
-
     pages: list[list[QuestionSlot]] = []
     current: list[QuestionSlot] = []
-    remaining = usable
+    remaining = _usable_height_mm(1)
 
     for slot in spec.questions:
-        needed = slot.height_mm + 6
+        needed = slot.height_mm + _SLOT_GAP_MM
         if current and needed > remaining:
             pages.append(current)
             current = []
-            remaining = usable
+            remaining = _usable_height_mm(len(pages) + 1)
         current.append(slot)
         remaining -= needed
 

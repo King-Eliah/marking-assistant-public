@@ -176,6 +176,24 @@ QUESTION_BOX_PADDING_MM: Final[float] = 4.0
 QUESTION_BOX_TITLE_HEIGHT_MM: Final[float] = 8.0
 QUESTION_BOX_MIN_HEIGHT_MM: Final[float] = 25.0
 
+#: The tallest a single question box may be.
+#:
+#: Set to what fits on page 1, which is the *shortest* page because of the
+#: identity box. Capping at the shortest page means any question fits on any
+#: page, so pagination never has to place a box it knows will overflow.
+#:
+#: A taller box is a specification error and is refused at construction —
+#: discovering it at print means a student meets a truncated answer box.
+QUESTION_BOX_MAX_HEIGHT_MM: Final[float] = (
+    PAGE_HEIGHT_MM
+    - 2 * CONTENT_MARGIN_MM
+    - QR_SIZE_MM
+    - 8.0
+    - IDENTITY_BOX_HEIGHT_MM
+    - 6.0  # gap below the box
+    - 6.0  # gap below the identity region
+)
+
 #: Ruled writing lines inside each answer region. 8 mm suits adult handwriting
 #: and gives OCR a predictable baseline pitch, which materially helps line
 #: segmentation on unlined prose.
