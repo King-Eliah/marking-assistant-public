@@ -25,6 +25,8 @@ from app.engines.booklet.layout import (
     CONTENT_MARGIN_MM,
     CONTENT_WIDTH_MM,
     FIDUCIAL_SIZE_MM,
+    IDENTITY_BOX_HEIGHT_MM,
+    IDENTITY_BOX_WIDTH_MM,
     PAGE_HEIGHT_MM,
     PAGE_WIDTH_MM,
     QR_SIZE_MM,
@@ -174,10 +176,51 @@ def _draw_header(pdf: canvas.Canvas, spec: BookletSpec, payload: BookletPayload)
     pdf.drawString(
         text_x,
         top - mm(24),
-        "Do not write your name. This booklet is identified by its code.",
+        "Do not write your name. Write your index number in the box below.",
     )
 
     return top - qr_side - mm(8)
+
+
+def _draw_identity_box(pdf: canvas.Canvas, bottom_of_header: float) -> float:
+    """The index-number box. Page 1 only.
+
+    Everything inside this rectangle is cropped away by Engine 1 before a
+    marker sees the page, so the marker cannot know whose script they are
+    marking even though the student wrote it plainly. Anonymity is enforced by
+    geometry, not by anyone remembering to look away.
+
+    The box is drawn from `layout` constants for the same reason the crop reads
+    them: if drawing and cropping ever disagreed, either identity would leak to
+    the marker or handwriting would be silently discarded.
+    """
+    left = mm(CONTENT_MARGIN_MM)
+    width = mm(IDENTITY_BOX_WIDTH_MM)
+    height = mm(IDENTITY_BOX_HEIGHT_MM)
+    bottom = bottom_of_header - height
+
+    pdf.setStrokeColor(black)
+    pdf.setLineWidth(1.0)
+    pdf.rect(left, bottom, width, height, stroke=1, fill=0)
+
+    pdf.setFillColor(black)
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(left + mm(3), bottom + height - mm(5.5), "INDEX NUMBER")
+
+    pdf.setFont("Helvetica", 6.5)
+    pdf.setFillColor(HexColor("#5A6472"))
+    pdf.drawString(
+        left + mm(3),
+        bottom + mm(3),
+        "Write clearly. This box is removed before marking.",
+    )
+
+    # A baseline to write on, so digits land in a predictable band.
+    pdf.setStrokeColor(_RULE_GREY)
+    pdf.setLineWidth(0.5)
+    pdf.line(left + mm(3), bottom + mm(7), left + width - mm(3), bottom + mm(7))
+
+    return bottom - mm(6)
 
 
 def _draw_question_box(pdf: canvas.Canvas, slot: QuestionSlot, top_y: float) -> float:
@@ -276,6 +319,11 @@ def generate(spec: BookletSpec) -> bytes:
 
         _draw_fiducials(pdf)
         y = _draw_header(pdf, spec, payload)
+
+        # Page 1 only. Repeating it would give a marker several chances to see
+        # an identity that was meant to be cropped exactly once.
+        if index == 1:
+            y = _draw_identity_box(pdf, y)
 
         for slot in slots:
             y = _draw_question_box(pdf, slot, y)

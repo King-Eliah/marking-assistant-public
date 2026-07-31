@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     jwt_access_ttl_seconds: int = 900
     jwt_refresh_ttl_seconds: int = 604800
 
+    #: Comma-separated Fernet keys, newest first. Encrypts student index
+    #: numbers at rest. Multiple keys allow rotation: new writes use the first,
+    #: existing ciphertexts stay readable under the rest.
+    #:
+    #: Empty is tolerated only in development, where an ephemeral key is
+    #: generated. Anywhere else the application refuses to start, because a
+    #: lost key means marks survive with no way to tell whose they are.
+    identity_encryption_keys: str = ""
+
     # `marking_app`, never the migration owner. The owner is a superuser in dev
     # and superusers bypass RLS entirely, so pointing the application at it
     # silently disables tenant isolation while every query still succeeds.
