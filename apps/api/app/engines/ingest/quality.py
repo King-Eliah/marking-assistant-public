@@ -72,9 +72,23 @@ MAX_SKEW_DEGREES: Final[float] = 12.0
 #: which is a normal hand-held angle and comfortably inside this.
 MAX_KEYSTONE: Final[float] = 0.70
 
-#: Mean luminance. Too dark loses stroke contrast; too bright clips it.
+#: Mean luminance, for the too-dark case only. Underexposure genuinely loses
+#: pencil strokes while leaving the high-contrast fiducials readable, so this
+#: catches something detection does not.
 MIN_BRIGHTNESS: Final[float] = 40.0
-MAX_BRIGHTNESS: Final[float] = 230.0
+
+#: Overexposure is measured as clipping, not as a high mean.
+#:
+#: A booklet page is mostly white paper, so mean luminance cannot separate a
+#: lightly-written page from a blown-out one — measured at 250 and 252
+#: respectively, both of which a mean-based threshold would reject. Since short
+#: answers are common, that would refuse exactly the pages most likely to be
+#: correct.
+#:
+#: Clipped pixels are the honest signal: paper photographs around 230-250 and
+#: only reaches 255 when detail has actually been lost. The reference
+#: photographs clip 0.0% of their pixels.
+MAX_CLIPPED_FRACTION: Final[float] = 0.25
 
 
 class Verdict(StrEnum):
@@ -99,6 +113,7 @@ class QualityReport:
     skew_degrees: float
     keystone: float
     brightness: float
+    clipped_fraction: float
     fiducials_found: int
     reasons: tuple[str, ...]
 
@@ -128,6 +143,15 @@ def measure_brightness(image: ImageArray) -> float:
     return float(np.mean(image))
 
 
+def measure_clipping(image: ImageArray) -> float:
+    """Fraction of pixels at pure white.
+
+    The overexposure signal. Unlike mean luminance this does not penalise a
+    page for being mostly paper, which every booklet page is.
+    """
+    return float(np.count_nonzero(image >= 255) / image.size)
+
+
 def assess(
     *,
     image: ImageArray,
@@ -143,6 +167,7 @@ def assess(
     """
     sharpness = measure_sharpness(image)
     brightness = measure_brightness(image)
+    clipping = measure_clipping(image)
 
     reasons: list[str] = []
     verdict = Verdict.ACCEPT
@@ -186,8 +211,12 @@ def assess(
 
     if brightness < MIN_BRIGHTNESS:
         reject("The photo is too dark. Find better light — avoid your own shadow.")
-    elif brightness > MAX_BRIGHTNESS:
-        reject("The photo is washed out. Move away from direct glare and turn the flash off.")
+
+    if clipping > MAX_CLIPPED_FRACTION:
+        reject(
+            f"{clipping:.0%} of the photo is pure white, so writing has been lost to "
+            f"glare. Move away from the light source and turn the flash off."
+        )
 
     return QualityReport(
         verdict=verdict,
@@ -196,6 +225,7 @@ def assess(
         skew_degrees=skew_degrees,
         keystone=keystone,
         brightness=brightness,
+        clipped_fraction=clipping,
         fiducials_found=fiducials_found,
         reasons=tuple(reasons),
     )
