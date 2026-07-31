@@ -14,7 +14,7 @@ from __future__ import annotations
 from contextlib import suppress
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import Engine, create_engine, text
 
 from app.core.db import RlsBypassError, assert_rls_applies, get_engine
 from app.core.scope import TenantScope
