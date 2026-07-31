@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     nli_model: str = "deberta-v3-base-mnli@1.0"
     prompt_version: str = "v3"
 
+    #: Origins allowed to call this API from a browser, comma separated.
+    #:
+    #: Explicit origins, never `*`. The clients send credentials so the browser
+    #: refuses a wildcard outright — and a wildcard would in any case let any
+    #: site make authenticated calls on a signed-in user's behalf.
+    cors_origins: str = "http://localhost:5173,http://localhost:5174"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # --- provider credentials
     #
     # Never literals in code or in a committed file. `.env` is gitignored;
