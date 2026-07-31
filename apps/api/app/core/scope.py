@@ -18,12 +18,23 @@ from typing import Protocol, TypeVar
 
 
 class TenantOwned(Protocol):
-    """Anything carrying a tenant. Every model inheriting `TenantScoped` fits."""
+    """Anything carrying a tenant. Every model inheriting `TenantScoped` fits.
 
-    tenant_id: uuid.UUID
+    Documentation rather than a bound: a SQLAlchemy model declares
+    `tenant_id: Mapped[uuid.UUID]`, and mypy compares protocols against that
+    declared type rather than what the descriptor yields on an instance, so
+    no mapped class ever matches structurally. Binding `T` to this pushed the
+    TypeVar to resolve against `None` and rejected every real call.
+    """
+
+    @property
+    def tenant_id(self) -> uuid.UUID: ...
 
 
-T = TypeVar("T", bound=TenantOwned)
+#: Unbound on purpose — see `TenantOwned`. The ownership check reads
+#: `tenant_id` defensively below, so a type lacking it is rejected rather than
+#: silently treated as owned.
+T = TypeVar("T")
 
 
 class NotFoundError(Exception):
@@ -50,8 +61,14 @@ class TenantScope:
 
     tenant_id: uuid.UUID
 
-    def owns(self, entity: TenantOwned) -> bool:
-        return entity.tenant_id == self.tenant_id
+    def owns(self, entity: object) -> bool:
+        """True only when `entity` carries this exact tenant.
+
+        A missing `tenant_id` is *not* ownership. Defaulting to a sentinel
+        rather than `self.tenant_id` means a type that forgot the column is
+        denied instead of silently passing every check.
+        """
+        return getattr(entity, "tenant_id", None) == self.tenant_id
 
 
 def require_owned(

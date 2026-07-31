@@ -35,8 +35,13 @@ jobs:
           --health-retries 20
 
     env:
-      DATABASE_URL: postgresql+psycopg://marking:marking@localhost:5433/marking
+      # The application connects as the unprivileged role. Pointing it at the
+      # owner leaves RLS in place and inert — see app/core/db.py.
+      DATABASE_URL: postgresql+psycopg://marking_app:marking_app@localhost:5433/marking
+      MIGRATION_DATABASE_URL: postgresql+psycopg://marking:marking@localhost:5433/marking
       TEST_DATABASE_URL: postgresql+psycopg://marking:marking@localhost:5433/marking
+      # Turns a skipped isolation test into a failed build.
+      REQUIRE_INTEGRATION: "1"
 
     steps:
       - uses: actions/checkout@v4

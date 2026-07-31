@@ -14,7 +14,10 @@ from app.core.config import get_settings
 from app.models import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# The owner URL, not the application's. Migrations create tables, policies and
+# the `marking_app` role itself — privileges the runtime credential must never
+# hold. See app/core/config.py.
+config.set_main_option("sqlalchemy.url", get_settings().migration_database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
