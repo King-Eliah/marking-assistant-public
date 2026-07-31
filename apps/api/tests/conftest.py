@@ -25,6 +25,41 @@ OWNER_URL = os.environ.get(
 #: The unprivileged role the application uses. RLS actually applies to this one.
 APP_URL = OWNER_URL.replace("marking:marking@", "marking_app:marking_app@")
 
+#: Set in CI. Turns a skipped integration test into a failure.
+REQUIRE_INTEGRATION = os.environ.get("REQUIRE_INTEGRATION") == "1"
+
+
+def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+    """Shout when the isolation tests did not actually run.
+
+    A skipped security test looks identical to a passing one in a summary line,
+    and "N passed" then reads as a guarantee it is not. This has already caused
+    one false all-clear, so the warning is deliberately hard to miss.
+    """
+    skipped = terminalreporter.stats.get("skipped", [])
+    if not skipped:
+        return
+
+    integration_skips = sum(
+        1
+        for report in skipped
+        if "test_rls" in report.nodeid
+        or "test_isolation_gate" in report.nodeid
+        or "test_audit_immutability" in report.nodeid
+    )
+    if not integration_skips:
+        return
+
+    terminalreporter.write_sep("=", "ISOLATION TESTS DID NOT RUN", red=True, bold=True)
+    terminalreporter.write_line(
+        f"{integration_skips} tenant-isolation and audit-immutability tests were "
+        f"SKIPPED because no database was reachable."
+    )
+    terminalreporter.write_line(
+        "A green run here does NOT mean isolation works. Start the stack with "
+        "`make dev` and run again before trusting this result."
+    )
+
 
 def _reachable(url: str) -> bool:
     engine = create_engine(url)
@@ -43,6 +78,8 @@ def _reachable(url: str) -> bool:
 def owner_engine() -> Iterator[Engine]:
     """Connects as the migration owner. Used for seeding only."""
     if not _reachable(OWNER_URL):
+        if REQUIRE_INTEGRATION:
+            pytest.fail("REQUIRE_INTEGRATION=1 but no database is reachable", pytrace=False)
         pytest.skip("no database reachable — run `make dev`")
     engine = create_engine(OWNER_URL)
     yield engine

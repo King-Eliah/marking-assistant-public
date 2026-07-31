@@ -1,21 +1,60 @@
-"""FastAPI application entrypoint.
+"""FastAPI application entrypoint."""
 
-Scaffold only. No engine, model, or business logic lives here yet — see
-docs/TASKS.md for what lands next (stage 1, the platform spine).
-"""
-
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.core.config import Settings, get_settings
+from app.core.db import assert_rls_applies
+from app.core.scope import NotFoundError
+from app.routers import courses
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Fail fast on a configuration that would disable tenant isolation.
+
+    Starting and serving traffic with RLS inert is worse than not starting:
+    every request succeeds, so the fault surfaces only when one institution
+    reads another's data.
+    """
+    del app
+    try:
+        assert_rls_applies()
+    except Exception:
+        logger.critical("refusing to start: tenant isolation is not in force")
+        raise
+    yield
+
 
 app = FastAPI(
     title="Marking Assistant API",
     version="0.1.0",
     docs_url="/docs",
+    lifespan=lifespan,
 )
+
+
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+    """Every `NotFoundError` becomes a bare 404.
+
+    The body deliberately carries no entity type or id. Echoing "course
+    <uuid> not found" back would confirm the shape of what was asked for,
+    which is the enumeration leak `require_owned` exists to close.
+    """
+    del request, exc
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "Not found"},
+    )
 
 
 class Health(BaseModel):
@@ -35,3 +74,6 @@ def healthz() -> Health:
         env=settings.app_env,
         pipeline_version=settings.pipeline_version,
     )
+
+
+app.include_router(courses.router)

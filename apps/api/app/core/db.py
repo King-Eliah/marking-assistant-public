@@ -63,6 +63,37 @@ def reset_session_tenant(session: Session) -> None:
     )
 
 
+class RlsBypassError(RuntimeError):
+    """The application is connected as a role that ignores RLS.
+
+    Every tenant-isolation policy is silently inert in this state and every
+    query still succeeds, so nothing looks wrong until one institution reads
+    another's marks. Refusing to start is the only safe response.
+    """
+
+
+def assert_rls_applies() -> None:
+    """Refuse to serve traffic as a SUPERUSER or BYPASSRLS role.
+
+    This is checked rather than assumed because it has already happened once:
+    pointing `DATABASE_URL` at the migration owner made every isolation test
+    pass while protecting nothing, and the only visible symptom was a listing
+    endpoint returning another tenant's rows.
+    """
+    with get_engine().connect() as conn:
+        row = conn.execute(
+            text("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
+        ).one()
+
+    if row.rolsuper or row.rolbypassrls:
+        raise RlsBypassError(
+            "the application is connected as a role with "
+            f"{'SUPERUSER' if row.rolsuper else 'BYPASSRLS'}. "
+            "Row-Level Security does not apply to it, so tenant isolation is "
+            "not in force. Connect as `marking_app`."
+        )
+
+
 @contextmanager
 def tenant_session(tenant_id: uuid.UUID) -> Iterator[Session]:
     """A session bound to one tenant for its whole lifetime."""

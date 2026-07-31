@@ -26,8 +26,17 @@ class Settings(BaseSettings):
     jwt_access_ttl_seconds: int = 900
     jwt_refresh_ttl_seconds: int = 604800
 
+    # `marking_app`, never the migration owner. The owner is a superuser in dev
+    # and superusers bypass RLS entirely, so pointing the application at it
+    # silently disables tenant isolation while every query still succeeds.
+    # `assert_rls_applies()` enforces this at startup rather than trusting it.
     # 5433 on the host — see the port comment in docker-compose.yml.
-    database_url: str = "postgresql+psycopg://marking:marking@localhost:5433/marking"
+    database_url: str = "postgresql+psycopg://marking_app:marking_app@localhost:5433/marking"
+
+    #: Migrations only. Owns the schema and creates `marking_app`, so it needs
+    #: privileges the application must never hold. Kept separate precisely so
+    #: the runtime credential cannot quietly acquire them.
+    migration_database_url: str = "postgresql+psycopg://marking:marking@localhost:5433/marking"
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint: str = "http://localhost:9000"
     s3_bucket: str = "marking-assistant"

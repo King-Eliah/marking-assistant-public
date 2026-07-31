@@ -11,6 +11,8 @@ of the chain is that the institution can check it themselves.
 
 from __future__ import annotations
 
+import ipaddress
+import logging
 import uuid
 from typing import Any
 
@@ -19,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import GENESIS_HASH, compute_row_hash
 from app.models.audit import AuditLog
+
+logger = logging.getLogger(__name__)
 
 
 class MissingActorError(Exception):
@@ -46,6 +50,26 @@ HUMAN_ACTIONS: frozenset[str] = frozenset(
         "results.export",
     }
 )
+
+
+def _safe_ip(value: str | None) -> str | None:
+    """Return `value` only if it parses as an IP address, else None.
+
+    `audit_log.ip` is INET, and Postgres rejects anything malformed with a
+    DataError. That would abort the whole append — so a caller passing an
+    unparseable value could stop a security event being recorded at all.
+
+    Losing one optional field is always preferable to losing the row. Behind a
+    proxy the address may come from a header, which makes it attacker-
+    controlled, so this is a real path rather than a theoretical one.
+    """
+    if value is None:
+        return None
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        logger.warning("discarding unparseable audit ip %r", value)
+        return None
 
 
 def _lock_tenant_chain(session: Session, tenant_id: uuid.UUID) -> None:
@@ -115,7 +139,7 @@ def append(
 
     entry = AuditLog(
         **{k: v for k, v in fields.items() if k != "at"},
-        ip=ip,
+        ip=_safe_ip(ip),
         user_agent=user_agent,
         prev_hash=prev_hash,
         row_hash=compute_row_hash(prev_hash, fields),
